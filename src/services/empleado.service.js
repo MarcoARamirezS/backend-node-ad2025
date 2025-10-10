@@ -1,55 +1,62 @@
+// src/services/empleado.service.js
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import empleadoRepository from '../repositories/empleado.repository.js'
 import EmpleadoModel from '../models/empleado.model.js'
 
+const TOKEN_EXP = '2h'
+
 export default {
-  async createEmpleado(data) {
-    const { nombre, apaterno, amaterno, usuario, password } = data
-    // Validamos nombre completo
-    const nombreDuplicado = await empleadoRepository.findByFullName(nombre, apaterno, amaterno)
-    if (nombreDuplicado) {
-      throw new Error('Ya existe un empleado con el mismo nombre')
-    }
-    const usuarioDuplicado = await empleadoRepository.findByUsuario(usuario)
-    if (usuarioDuplicado) {
-      throw new Error('Ya existe un empleado con el mismo usuario')
-    }
-    const hashedPassword = await bcrypt.hash(password, 10)
-    const empleadoNuevo = new EmpleadoModel({
-      ...data,
-      password: hashedPassword
+  async createEmpleado(payload) {
+    const { nombre, apaterno, amaterno, usuario, password, ...rest } = payload
+
+    const byName = await empleadoRepository.findByFullName(nombre, apaterno, amaterno)
+    if (byName) throw new Error('Ya existe un empleado con el mismo nombre completo')
+
+    const byUser = await empleadoRepository.findByUsuario(usuario)
+    if (byUser) throw new Error('Ya existe un empleado con el mismo usuario')
+
+    const hash = await bcrypt.hash(password, 10)
+    const model = new EmpleadoModel({
+      nombre, apaterno, amaterno, usuario,
+      password: hash,
+      ...rest
     })
-    return await empleadoRepository.create({ ...empleadoNuevo })
+
+    const created = await empleadoRepository.create(model)
+    return created
   },
-  async updateEmpleado (id, data) {
+
+  async updateEmpleado(id, payload) {
+    const data = { ...payload }
     if (data.password) {
       data.password = await bcrypt.hash(data.password, 10)
     }
-    return await empleadoRepository.update(id, data)
+    await empleadoRepository.update(id, data)
+    return { id }
   },
-  async deleteEmpleado (id) {
-    return await empleadoRepository.delete(id)
+
+  async deleteEmpleado(id) {
+    await empleadoRepository.remove(id)
+    return { id }
   },
-  async getAllEmpleados () {
-    return await empleadoRepository.getAll()
+
+  async getAll() {
+    return empleadoRepository.getAllSafe()
   },
-  async login (usuario, password) {
+
+  async login(usuario, password) {
     const empleado = await empleadoRepository.findByUsuario(usuario)
-    if (!empleado) {
-      throw new Error('Usuario no encontrado')
-    }
-    const passwordValid = await bcrypt.compare(password, empleado.password)
-    if (!passwordValid) {
-      throw new Error('Password Incorrecto')
-    }
-    const token = jwt.sign({
-      usuario: empleado.usuario,
-      id: empleado.id,
-      nombre: empleado.nombre
-    }, process.env.JWT_SECRET, {
-      expiresIn: '1h'
-    })
-    return { token }
+    if (!empleado) throw new Error('Usuario no encontrado')
+
+    const ok = await bcrypt.compare(password, empleado.password ?? '')
+    if (!ok) throw new Error('Password incorrecto')
+
+    const token = jwt.sign(
+      { id: empleado.id, usuario: empleado.usuario, nombre: empleado.nombre },
+      process.env.JWT_SECRET,
+      { expiresIn: TOKEN_EXP }
+    )
+    return token
   }
 }
