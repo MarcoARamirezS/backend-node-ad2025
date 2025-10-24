@@ -22,7 +22,7 @@ export default {
       password: hash,
       ...rest
     })
-
+    console.log('@@@ model => ', model)
     const created = await empleadoRepository.create(model)
     return created
   },
