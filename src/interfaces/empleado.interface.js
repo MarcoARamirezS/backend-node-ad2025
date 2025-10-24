@@ -1,6 +1,6 @@
 export default class EmpleadoInteface {
   constructor({
-    nombre, apaterno, amaterno, direccion, telefono, ciudad, estado, usuario, password
+    nombre, apaterno, amaterno, direccion, telefono, ciudad, estado, usuario, password, rol
   }) {
     this.nombre = nombre
     this.apaterno = apaterno
@@ -11,5 +11,6 @@ export default class EmpleadoInteface {
     this.estado = estado
     this.usuario = usuario
     this.password = password
+    this.rol = rol
   }
 }
